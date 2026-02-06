@@ -34,3 +34,14 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Video project source (only keep output video)
+video-remotion/src/
+video-remotion/node_modules/
+video-remotion/public/
+video-remotion/package.json
+video-remotion/tsconfig.json
+
+# Topology source files (only keep output images)
+topology/*.drawio
+topology/*.md
