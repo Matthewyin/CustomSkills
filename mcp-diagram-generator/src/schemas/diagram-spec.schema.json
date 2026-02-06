@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Diagram Specification",
+  "description": "Schema for diagram specification passed to mcp-diagram-generator",
+  "type": "object",
+  "required": ["format", "elements"],
+  "properties": {
+    "format": {
+      "type": "string",
+      "enum": ["drawio", "mermaid", "excalidraw"],
+      "description": "Target diagram format"
+    },
+    "title": {
+      "type": "string",
+      "description": "Diagram title"
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/container" },
+          { "$ref": "#/definitions/node" },
+          { "$ref": "#/definitions/edge" }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "container": {
+      "type": "object",
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": { "const": "container" },
+        "name": { "type": "string" },
+        "level": {
+          "type": "string",
+          "enum": ["environment", "datacenter", "zone", "other"]
+        },
+        "style": { "$ref": "#/definitions/style" },
+        "geometry": { "$ref": "#/definitions/geometry" },
+        "children": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/definitions/container" },
+              { "$ref": "#/definitions/node" }
+            ]
+          }
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": { "const": "node" },
+        "name": { "type": "string" },
+        "deviceType": {
+          "type": "string",
+          "enum": ["router", "switch", "firewall", "server", "pc", "database", "cloud", "other"]
+        },
+        "shape": {
+          "type": "string",
+          "enum": ["rect", "ellipse", "diamond", "parallelogram", "rounded", "cylinder", "cloud", "other"]
+        },
+        "style": { "$ref": "#/definitions/style" },
+        "geometry": { "$ref": "#/definitions/geometry" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["type", "source", "target"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": { "const": "edge" },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "label": { "type": "string" },
+        "style": { "$ref": "#/definitions/edgeStyle" }
+      }
+    },
+    "style": {
+      "type": "object",
+      "properties": {
+        "fillColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "strokeColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "strokeWidth": { "type": "number", "minimum": 0 },
+        "fontColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "fontSize": { "type": "number", "minimum": 6 },
+        "fontStyle": { "type": "string", "enum": ["normal", "bold", "italic"] },
+        "borderRadius": { "type": "number", "minimum": 0 },
+        "dashPattern": { "type": "string" }
+      }
+    },
+    "edgeStyle": {
+      "type": "object",
+      "properties": {
+        "strokeColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "strokeWidth": { "type": "number", "minimum": 0 },
+        "endArrow": { "type": "string", "enum": ["none", "arrow", "circle", "diamond"] },
+        "startArrow": { "type": "string", "enum": ["none", "arrow", "circle", "diamond"] },
+        "dashPattern": { "type": "string" },
+        "lineStyle": { "type": "string", "enum": ["straight", "orthogonal", "curved"] }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "minimum": 10 },
+        "height": { "type": "number", "minimum": 10 }
+      }
+    }
+  }
+}
