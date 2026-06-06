@@ -2,6 +2,8 @@
 node_modules/
 package-lock.json
 yarn.lock
+__pycache__/
+*.pyc
 
 # Build outputs
 dist/

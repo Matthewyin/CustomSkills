@@ -1,6 +1,6 @@
-# MCP Skills
+# CustomSkills
 
-This repository contains reusable MCP-related skills, servers, and Codex plugin packages.
+This repository contains reusable Codex skills, MCP servers, and plugin packages.
 
 ## Diagram Generator
 
@@ -25,10 +25,19 @@ The plugin MCP configuration uses:
 
 This intentionally resolves the latest npm package at runtime.
 
+## Subtitle Converter
+
+`subtitle-converter` is a standalone skill for subtitle format conversion.
+
+- Converts between VTT, SRT, ASS, and LRC.
+- Supports timeline offset.
+- Supports bilingual subtitle merging.
+- Uses only the Python standard library.
+
 ## Repository Layout
 
 ```text
-mcp-skills/
+CustomSkills/
 ├── mcp-diagram-generator/
 │   ├── scripts/
 │   ├── src/
@@ -40,13 +49,23 @@ mcp-skills/
 │       ├── .mcp.json
 │       └── skills/
 └── skills/
-    └── diagram-generator/
+    ├── diagram-generator/
+    │   ├── SKILL.md
+    │   ├── package.json
+    │   └── references/
+    └── subtitle-converter/
         ├── SKILL.md
-        ├── package.json
+        ├── scripts/
         └── references/
 ```
 
 ## Local Checks
+
+Run subtitle converter syntax checks:
+
+```bash
+python3 -m py_compile skills/subtitle-converter/scripts/convert.py
+```
 
 Run MCP server checks from `mcp-diagram-generator/`:
 
