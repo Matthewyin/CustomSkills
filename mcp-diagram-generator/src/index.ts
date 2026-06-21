@@ -11,6 +11,7 @@ import { DrawioGenerator } from './generators/drawio.js';
 import { MermaidGenerator } from './generators/mermaid.js';
 import { ExcalidrawGenerator } from './generators/excalidraw.js';
 import { SchemaValidator } from './utils/validator.js';
+import { resolveDiagramOutputPath } from './utils/output-path.js';
 import { GenerateDiagramParams, DiagramSpec, DiagramFormat } from './types.js';
 import { ConfigManager } from './config.js';
 import * as path from 'path';
@@ -177,7 +178,7 @@ class DiagramServer {
     ];
   }
 
-  private async handleGenerateDiagram(params: GenerateDiagramParams & { filename?: string }): Promise<any> {
+  private async handleGenerateDiagram(params: GenerateDiagramParams): Promise<any> {
     await this.configManager.load();
 
     const { diagram_spec, output_path, format, filename } = params;
@@ -213,14 +214,11 @@ class DiagramServer {
     }
 
     try {
-      let finalPath = output_path;
-
-      if (!finalPath) {
-        // Use default configured path
-        const defaultDir = this.configManager.getOutputPath(spec.format as DiagramFormat);
-        const defaultFilename = filename || this.generateFilename(spec);
-        finalPath = path.join(this.projectRoot, defaultDir, defaultFilename);
-      }
+      const finalPath = await this.resolveOutputPath(
+        spec,
+        output_path,
+        filename
+      );
 
       // Ensure directory exists
       const dir = path.dirname(finalPath);
@@ -370,6 +368,22 @@ class DiagramServer {
                       spec.format === 'excalidraw' ? 'excalidraw' : 'txt';
 
     return `${baseName}-${timestamp}.${extension}`;
+  }
+
+  private async resolveOutputPath(
+    spec: DiagramSpec,
+    outputPath?: string,
+    filename?: string
+  ): Promise<string> {
+    const format = spec.format as DiagramFormat;
+    const defaultDir = this.configManager.getOutputPath(format);
+    return resolveDiagramOutputPath({
+      projectRoot: this.projectRoot,
+      defaultDir,
+      format,
+      outputPath,
+      filename: filename || this.generateFilename(spec)
+    });
   }
 
   async run(): Promise<void> {

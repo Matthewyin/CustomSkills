@@ -135,6 +135,7 @@ export interface DiagramSpec {
 
 export interface GenerateDiagramParams {
   diagram_spec: DiagramSpec;
-  output_path: string;
+  output_path?: string;
   format?: DiagramFormat;
+  filename?: string;
 }

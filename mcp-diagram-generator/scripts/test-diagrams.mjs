@@ -1,8 +1,10 @@
 import fs from 'fs/promises';
+import path from 'path';
 import { DrawioGenerator } from '../dist/generators/drawio.js';
 import { ExcalidrawGenerator } from '../dist/generators/excalidraw.js';
 import { MermaidGenerator } from '../dist/generators/mermaid.js';
 import { SchemaValidator } from '../dist/utils/validator.js';
+import { resolveDiagramOutputPath } from '../dist/utils/output-path.js';
 
 const drawio = new DrawioGenerator();
 const excalidraw = new ExcalidrawGenerator();
@@ -48,6 +50,48 @@ function hasEdgeLabel(xml) {
 
 async function read(path) {
   return fs.readFile(path, 'utf8');
+}
+
+async function testOutputPathResolution() {
+  const root = './diagrams/regression/output-path-root';
+  await fs.rm(root, { recursive: true, force: true });
+
+  const defaultPath = await resolveDiagramOutputPath({
+    projectRoot: root,
+    defaultDir: 'diagrams/drawio',
+    format: 'drawio',
+    filename: 'default-name'
+  });
+  assert(defaultPath === path.join(root, 'diagrams/drawio/default-name.drawio'), '默认路径必须补齐文件扩展名');
+
+  const directoryPath = await resolveDiagramOutputPath({
+    projectRoot: root,
+    defaultDir: 'diagrams/drawio',
+    format: 'drawio',
+    outputPath: 'custom/drawio',
+    filename: 'from-dir'
+  });
+  assert(directoryPath === path.join(root, 'custom/drawio/from-dir.drawio'), '目录式 output_path 必须拼接文件名');
+
+  const filePath = await resolveDiagramOutputPath({
+    projectRoot: root,
+    defaultDir: 'diagrams/drawio',
+    format: 'drawio',
+    outputPath: 'custom/file.drawio',
+    filename: 'ignored'
+  });
+  assert(filePath === path.join(root, 'custom/file.drawio'), '文件式 output_path 必须保持原文件名');
+
+  const existingDir = path.join(root, 'existing.v1');
+  await fs.mkdir(existingDir, { recursive: true });
+  const existingDirPath = await resolveDiagramOutputPath({
+    projectRoot: root,
+    defaultDir: 'diagrams/drawio',
+    format: 'drawio',
+    outputPath: 'existing.v1',
+    filename: 'inside'
+  });
+  assert(existingDirPath === path.join(existingDir, 'inside.drawio'), '已存在目录即使带点号也必须按目录处理');
 }
 
 async function testNetworkTopology() {
@@ -308,6 +352,7 @@ async function testExcalidraw() {
 }
 
 async function main() {
+  await testOutputPathResolution();
   await testNetworkTopology();
   await testArchitecture();
   await testSwimlane();
