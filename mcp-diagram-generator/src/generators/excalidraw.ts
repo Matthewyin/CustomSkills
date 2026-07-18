@@ -72,13 +72,31 @@ export class ExcalidrawGenerator {
   private boundArrowsMap = new Map<string, Array<{ type: 'arrow'; id: string }>>();
   private edgeIdMap = new Map<any, string>();
   private nextId = 1;
+  // 记录输入 spec 中显式给出了 x/y 的元素 id，避免默认几何填充后无法区分显式 (0,0)
+  private explicitPositionIds = new Set<string>();
 
   async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
     this.resetState();
-    const data = this.generateData(spec);
+    // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
+    const cloned = structuredClone(spec);
+    this.markExplicitPositions(cloned.elements);
+    const data = this.generateData(cloned);
     const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  // 在任何默认几何填充之前，记录哪些元素在输入中显式指定了 x/y
+  private markExplicitPositions(elements: any[]): void {
+    for (const element of elements) {
+      if (element.type === 'edge') continue;
+      if (element.geometry && element.geometry.x !== undefined && element.geometry.y !== undefined) {
+        this.explicitPositionIds.add(element.id);
+      }
+      if (element.children) {
+        this.markExplicitPositions(element.children);
+      }
+    }
   }
 
   private resetState(): void {
@@ -87,6 +105,7 @@ export class ExcalidrawGenerator {
     this.boundArrowsMap.clear();
     this.edgeIdMap.clear();
     this.nextId = 1;
+    this.explicitPositionIds.clear();
   }
 
   private preassignIds(elements: any[]): void {
@@ -512,8 +531,9 @@ export class ExcalidrawGenerator {
     let rowHeight = 0;
 
     for (const element of elements) {
-      const geometry = this.ensureElementGeometry(element);
+      // 必须先判断是否自动摆放，再补默认几何，否则默认的 (0,0) 会被误判为未指定
       const shouldPlace = this.shouldAutoPlace(element);
+      const geometry = this.ensureElementGeometry(element);
 
       if (shouldPlace) {
         geometry.x = cursorX;
@@ -569,7 +589,8 @@ export class ExcalidrawGenerator {
   }
 
   private shouldAutoPlace(element: Container | Node): boolean {
-    return !element.geometry || ((element.geometry.x || 0) === 0 && (element.geometry.y || 0) === 0);
+    // 输入中未显式指定 x/y 的元素才自动摆放；显式 (0,0) 也应被尊重
+    return !this.explicitPositionIds.has(element.id);
   }
 
   private getCenter(position: ElementPosition): Point {

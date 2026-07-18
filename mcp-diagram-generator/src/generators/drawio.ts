@@ -36,9 +36,12 @@ export class DrawioGenerator {
   private shouldForceStraightEdges = false;
   private swimlaneStepColumns = new Map<string, number>();
   private swimlaneColumnCount = 0;
+  // 记录输入 spec 中显式给出了 x/y 的元素 id，避免默认几何填充后无法区分显式 (0,0)
+  private explicitPositionIds = new Set<string>();
 
   async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
-    const xml = this.generateXml(spec);
+    // 深拷贝入参，布局归一化会改写 geometry/shape，不能污染调用方对象
+    const xml = this.generateXml(structuredClone(spec));
     const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(outputPath, xml, 'utf-8');
@@ -46,6 +49,7 @@ export class DrawioGenerator {
 
   private generateXml(spec: DiagramSpec): string {
     this.resetState();
+    this.markExplicitPositions(spec);
 
     const elements = this.buildDrawableElements(spec);
     const isNetworkTopology = this.isNetworkTopology(elements, spec.diagramType);
@@ -85,6 +89,27 @@ ${childrenXml}${edgesXml}
     this.shouldForceStraightEdges = false;
     this.swimlaneStepColumns.clear();
     this.swimlaneColumnCount = 0;
+    this.explicitPositionIds.clear();
+  }
+
+  // 在任何默认几何填充之前，记录哪些元素在输入中显式指定了 x/y
+  private markExplicitPositions(spec: DiagramSpec): void {
+    const mark = (elements: any[]): void => {
+      for (const element of elements) {
+        if (element.type === 'edge') continue;
+        if (element.geometry && element.geometry.x !== undefined && element.geometry.y !== undefined) {
+          this.explicitPositionIds.add(element.id);
+        }
+        if (element.children) {
+          mark(element.children);
+        }
+      }
+    };
+
+    mark(spec.elements || []);
+    for (const layer of spec.layers || []) {
+      mark(layer.components || []);
+    }
   }
 
   private buildDrawableElements(spec: DiagramSpec): any[] {
@@ -298,11 +323,11 @@ ${childrenXml}${edgesXml}
     let result = 'html=1;rounded=0;endFill=0;fontSize=9;labelBackgroundColor=#ffffff;';
 
     if (merged.endArrow && merged.endArrow !== 'none') {
-      result = `html=1;rounded=0;endFill=1;endArrow=${merged.endArrow};fontSize=9;labelBackgroundColor=#ffffff;`;
+      result = `html=1;rounded=0;endFill=1;endArrow=${this.escapeXml(String(merged.endArrow))};fontSize=9;labelBackgroundColor=#ffffff;`;
     }
 
     if (merged.startArrow && merged.startArrow !== 'none') {
-      result += `startArrow=${merged.startArrow};`;
+      result += `startArrow=${this.escapeXml(String(merged.startArrow))};`;
     }
 
     if (merged.lineStyle === 'orthogonal') {
@@ -310,7 +335,7 @@ ${childrenXml}${edgesXml}
     }
 
     if (merged.strokeColor) {
-      result += `strokeColor=${merged.strokeColor};`;
+      result += `strokeColor=${this.escapeXml(String(merged.strokeColor))};`;
     }
 
     if (merged.strokeWidth) {
@@ -318,7 +343,7 @@ ${childrenXml}${edgesXml}
     }
 
     if (merged.dashPattern) {
-      result += `dashed=1;dashPattern=${merged.dashPattern};`;
+      result += `dashed=1;dashPattern=${this.escapeXml(String(merged.dashPattern))};`;
     }
 
     if (source && target) {
@@ -578,10 +603,11 @@ ${childrenXml}${edgesXml}
   private styleToString(style: Style): string {
     const parts: string[] = [];
 
-    if (style.fillColor) parts.push(`fillColor=${style.fillColor}`);
-    if (style.strokeColor) parts.push(`strokeColor=${style.strokeColor}`);
+    // 用户提供的字符串值拼进 XML 属性前必须转义
+    if (style.fillColor) parts.push(`fillColor=${this.escapeXml(style.fillColor)}`);
+    if (style.strokeColor) parts.push(`strokeColor=${this.escapeXml(style.strokeColor)}`);
     if (style.strokeWidth) parts.push(`strokeWidth=${style.strokeWidth}`);
-    if (style.fontColor) parts.push(`fontColor=${style.fontColor}`);
+    if (style.fontColor) parts.push(`fontColor=${this.escapeXml(style.fontColor)}`);
     if (style.fontSize) parts.push(`fontSize=${style.fontSize}`);
     if (style.fontStyle === 'bold') parts.push('fontStyle=1');
     if (style.fontStyle === 'italic') parts.push('fontStyle=2');
@@ -1110,7 +1136,7 @@ ${childrenXml}${edgesXml}
   }
 
   private hasExplicitPosition(element: DiagramVertex): boolean {
-    return Boolean(element.geometry && (element.geometry.x !== 0 || element.geometry.y !== 0));
+    return this.explicitPositionIds.has(element.id);
   }
 
   private getGeometry(element: DiagramVertex): Required<Geometry> {

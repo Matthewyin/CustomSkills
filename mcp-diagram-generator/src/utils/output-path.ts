@@ -23,15 +23,20 @@ export async function resolveDiagramOutputPath({
     return path.join(projectRoot, defaultDir, normalizedFilename);
   }
 
-  const resolvedPath = path.isAbsolute(outputPath)
-    ? outputPath
-    : path.join(projectRoot, outputPath);
+  const resolvedPath = resolveConfiguredPath(projectRoot, outputPath);
 
   if (await isDirectoryLikePath(resolvedPath, outputPath, format)) {
     return path.join(resolvedPath, normalizedFilename);
   }
 
   return resolvedPath;
+}
+
+// 配置路径统一解析：绝对路径原样使用，相对路径拼到 projectRoot
+export function resolveConfiguredPath(projectRoot: string, configuredPath: string): string {
+  return path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.join(projectRoot, configuredPath);
 }
 
 async function isDirectoryLikePath(
@@ -74,6 +79,6 @@ function hasDiagramExtension(filePath: string, format: DiagramFormat): boolean {
 
 function getDefaultExtension(format: DiagramFormat): string {
   return format === 'drawio' ? 'drawio' :
-         format === 'mermaid' ? 'md' :
+         format === 'mermaid' ? 'mmd' :
          format === 'excalidraw' ? 'excalidraw' : 'txt';
 }

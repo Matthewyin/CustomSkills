@@ -4,7 +4,8 @@ import { DiagramSpec, Node, Edge, ShapeType } from '../types.js';
 
 export class MermaidGenerator {
   async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
-    const mermaidCode = this.generateCode(spec);
+    // 深拷贝入参，生成过程会给节点补默认 shape / style class，不能污染调用方对象
+    const mermaidCode = this.generateCode(structuredClone(spec));
     const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(outputPath, mermaidCode, 'utf-8');
@@ -280,7 +281,8 @@ export class MermaidGenerator {
     const target = this.formatId(edge.target);
 
     const arrowStyle = edge.style?.endArrow === 'none' ? '---' : '-->';
-    const label = edge.label ? `|${edge.label}|` : '';
+    // label 必须走 formatLabel 转义，否则含双引号会破坏 Mermaid 语法
+    const label = edge.label ? `|${this.formatLabel(edge.label)}|` : '';
 
     // 正确的 Mermaid 语法: source-->|label|target
     return `${source}${arrowStyle}${label}${target}`;

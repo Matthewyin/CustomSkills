@@ -46,3 +46,4 @@ temp/
 # Generated diagrams and local outputs
 diagrams/
 topology/
+.diagram-config.json

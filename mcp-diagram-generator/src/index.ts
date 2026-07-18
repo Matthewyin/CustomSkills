@@ -5,17 +5,30 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  McpError,
+  ErrorCode,
   Tool
 } from '@modelcontextprotocol/sdk/types.js';
 import { DrawioGenerator } from './generators/drawio.js';
 import { MermaidGenerator } from './generators/mermaid.js';
 import { ExcalidrawGenerator } from './generators/excalidraw.js';
 import { SchemaValidator } from './utils/validator.js';
-import { resolveDiagramOutputPath } from './utils/output-path.js';
+import { resolveConfiguredPath, resolveDiagramOutputPath } from './utils/output-path.js';
 import { GenerateDiagramParams, DiagramSpec, DiagramFormat } from './types.js';
 import { ConfigManager } from './config.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { readFileSync } from 'fs';
+
+// 从 package.json 读取版本号，避免硬编码版本漂移
+function getPackageVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 class DiagramServer {
   private server: Server;
@@ -34,7 +47,7 @@ class DiagramServer {
     this.server = new Server(
       {
         name: 'mcp-diagram-generator',
-        version: '1.0.1'
+        version: getPackageVersion()
       },
       {
         capabilities: {
@@ -76,15 +89,7 @@ class DiagramServer {
         return await this.handleSetOutputPath(args as unknown as { format: DiagramFormat; path: string });
       }
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Unknown tool: ${name}`
-          }
-        ],
-        isError: true
-      };
+      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
     });
   }
 
@@ -313,9 +318,9 @@ class DiagramServer {
         {
           type: 'text',
           text: `Configuration initialized:\n` +
-            `  DrawIO: ${path.join(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
-            `  Mermaid: ${path.join(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
-            `  Excalidraw: ${path.join(this.projectRoot, config.defaultOutputPaths.excalidraw)}\n\n` +
+            `  DrawIO: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
+            `  Mermaid: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
+            `  Excalidraw: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.excalidraw)}\n\n` +
             `Directories created automatically.`
         }
       ]
@@ -332,18 +337,30 @@ class DiagramServer {
           text: `Current configuration:\n` +
             `  Project Root: ${this.projectRoot}\n` +
             `  Initialized: ${config.initialized}\n` +
-            `  DrawIO Path: ${path.join(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
-            `  Mermaid Path: ${path.join(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
-            `  Excalidraw Path: ${path.join(this.projectRoot, config.defaultOutputPaths.excalidraw)}`
+            `  DrawIO Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
+            `  Mermaid Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
+            `  Excalidraw Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.excalidraw)}`
         }
       ]
     };
   }
 
   private async handleSetOutputPath(args: { format: DiagramFormat; path: string }): Promise<any> {
+    if (!['drawio', 'mermaid', 'excalidraw'].includes(args.format)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid format: ${args.format}. Expected one of: drawio, mermaid, excalidraw`
+          }
+        ],
+        isError: true
+      };
+    }
+
     await this.configManager.setOutputPath(args.format, args.path);
 
-    const fullPath = path.join(this.projectRoot, args.path);
+    const fullPath = resolveConfiguredPath(this.projectRoot, args.path);
     await fs.mkdir(fullPath, { recursive: true });
 
     return {
@@ -364,7 +381,7 @@ class DiagramServer {
 
     const timestamp = new Date().toISOString().slice(0, 10);
     const extension = spec.format === 'drawio' ? 'drawio' :
-                      spec.format === 'mermaid' ? 'md' :
+                      spec.format === 'mermaid' ? 'mmd' :
                       spec.format === 'excalidraw' ? 'excalidraw' : 'txt';
 
     return `${baseName}-${timestamp}.${extension}`;
