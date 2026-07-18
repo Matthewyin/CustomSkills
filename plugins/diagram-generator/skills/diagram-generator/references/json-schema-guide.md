@@ -2,6 +2,8 @@
 
 This guide describes the JSON specification passed to the `mcp-diagram-generator` MCP server.
 
+> **Source of truth**: structural constraints (required fields, id patterns, enums, color formats) are defined by `mcp-diagram-generator/src/schemas/diagram-spec.schema.json` and enforced by the server via ajv. This document focuses on conventions and examples; when the two disagree, the schema file wins.
+
 ## Root Object
 
 ```json

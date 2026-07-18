@@ -25,6 +25,20 @@ The plugin MCP configuration uses:
 
 This intentionally resolves the latest npm package at runtime.
 
+### Skill source of truth and sync
+
+`skills/diagram-generator/` is the single source of truth for the skill. The copy at
+`plugins/diagram-generator/skills/diagram-generator/` is generated — never edit it directly.
+After changing anything under `skills/diagram-generator/`, run:
+
+```bash
+node scripts/sync-plugin-skill.mjs
+```
+
+The script wipes the plugin copy and re-copies the source (`fs.cpSync`), so
+`diff -r skills/diagram-generator plugins/diagram-generator/skills/diagram-generator`
+must be empty before committing.
+
 ## Subtitle Converter
 
 `subtitle-converter` is a standalone skill for subtitle format conversion.

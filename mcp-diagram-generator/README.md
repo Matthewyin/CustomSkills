@@ -88,7 +88,6 @@ Claude: I'll generate a microservices architecture diagram for you...
 | **Sequence Diagram** | Message interactions, API calls | Mermaid |
 | **Class Diagram** | Class structures, relationship diagrams | Mermaid / Draw.io |
 | **ER Diagram** | Database relationship diagrams | Mermaid / Draw.io |
-| **Mind Map** | Hierarchical structures, brainstorming | Mermaid / Excalidraw |
 | **Network Topology** | Network architecture, device connections | Draw.io (supports 4-level nesting) |
 
 ---

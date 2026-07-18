@@ -32,7 +32,7 @@ Ask in one concise message:
 
 ```text
 Please confirm a few basics first:
-1. Diagram type: network topology / architecture / flowchart / swimlane / sequence / class / ER / mind map / whiteboard sketch
+1. Diagram type: network topology / architecture / flowchart / swimlane / sequence / class / ER / whiteboard sketch
 2. Output format: Draw.io / Mermaid / Excalidraw / let me recommend
 3. Layout direction: vertical / horizontal / automatic; network topology defaults to vertical
 4. Usage context: Word / PPT / documentation / whiteboard collaboration / code repository
@@ -54,7 +54,6 @@ Use these defaults only when the user selects "let me recommend" or "automatic",
 | Sequence | Mermaid | Automatic |
 | Class | Mermaid | Automatic |
 | ER | Mermaid | Automatic |
-| Mind map | Mermaid | Automatic |
 | Whiteboard sketch | Excalidraw | Automatic |
 
 ## Usage Context Rules
