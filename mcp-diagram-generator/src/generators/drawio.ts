@@ -1,6 +1,14 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DiagramSpec, Container, Node, Edge, Style, Geometry, Swimlane, SwimlaneStep } from '../types.js';
+import {
+  includesAny,
+  isFlowchartBackwardEdge,
+  isFlowchartDecisionNode,
+  isFlowchartEndNode,
+  isFlowchartStartNode
+} from './shared/flowchart-keywords.js';
+import { ensureGeometry, expandContainerToFitChildren, markExplicitPositions, readGeometry } from './shared/geometry.js';
 
 type DiagramVertex = Container | Node;
 type FlatNode = {
@@ -94,21 +102,9 @@ ${childrenXml}${edgesXml}
 
   // 在任何默认几何填充之前，记录哪些元素在输入中显式指定了 x/y
   private markExplicitPositions(spec: DiagramSpec): void {
-    const mark = (elements: any[]): void => {
-      for (const element of elements) {
-        if (element.type === 'edge') continue;
-        if (element.geometry && element.geometry.x !== undefined && element.geometry.y !== undefined) {
-          this.explicitPositionIds.add(element.id);
-        }
-        if (element.children) {
-          mark(element.children);
-        }
-      }
-    };
-
-    mark(spec.elements || []);
+    markExplicitPositions(spec.elements || [], this.explicitPositionIds);
     for (const layer of spec.layers || []) {
-      mark(layer.components || []);
+      markExplicitPositions(layer.components || [], this.explicitPositionIds);
     }
   }
 
@@ -235,7 +231,8 @@ ${childrenXml}${edgesXml}
 
   private buildContainerXml(id: string, container: Container, parentId: string): string {
     const style = this.buildContainerStyle(container.style, container.level);
-    const { x = 0, y = 0, width = 300, height = 200 } = container.geometry || {};
+    // normalizeLayout 已保证几何齐全，无需死默认值
+    const { x, y, width, height } = container.geometry!;
     const name = this.escapeXml(container.name);
 
     return `        <mxCell id="${id}" value="${name}" style="${style}" parent="${parentId}" vertex="1">
@@ -245,7 +242,8 @@ ${childrenXml}${edgesXml}
 
   private buildNodeXml(id: string, node: Node, parentId: string): string {
     const style = this.buildNodeStyle(node.style, node.deviceType, node.shape);
-    const { x = 0, y = 0, width = 100, height = 50 } = node.geometry || {};
+    // normalizeLayout 已保证几何齐全，无需死默认值
+    const { x, y, width, height } = node.geometry!;
     const name = this.escapeXml(node.name);
 
     return `        <mxCell id="${id}" value="${name}" style="${style}" parent="${parentId}" vertex="1">
@@ -408,23 +406,23 @@ ${childrenXml}${edgesXml}
   private getArchitectureLayerStyle(name: string): Style {
     const text = name.toLowerCase();
 
-    if (this.includesAny(text, ['client', 'user', 'external', '用户', '客户端', '外部'])) {
+    if (includesAny(text, ['client', 'user', 'external', '用户', '客户端', '外部'])) {
       return { fillColor: '#F8FAFC', strokeColor: '#64748B', fontSize: DEFAULT_FONT_SIZE, fontStyle: 'bold' };
     }
 
-    if (this.includesAny(text, ['access', 'gateway', 'edge', '入口', '网关', '接入'])) {
+    if (includesAny(text, ['access', 'gateway', 'edge', '入口', '网关', '接入'])) {
       return { fillColor: '#E0F2FE', strokeColor: '#0284C7', fontSize: DEFAULT_FONT_SIZE, fontStyle: 'bold' };
     }
 
-    if (this.includesAny(text, ['service', 'application', 'app', '服务', '应用'])) {
+    if (includesAny(text, ['service', 'application', 'app', '服务', '应用'])) {
       return { fillColor: '#E0E7FF', strokeColor: '#4F46E5', fontSize: DEFAULT_FONT_SIZE, fontStyle: 'bold' };
     }
 
-    if (this.includesAny(text, ['data', 'storage', 'database', '数据', '存储'])) {
+    if (includesAny(text, ['data', 'storage', 'database', '数据', '存储'])) {
       return { fillColor: '#F3E8FF', strokeColor: '#9333EA', fontSize: DEFAULT_FONT_SIZE, fontStyle: 'bold' };
     }
 
-    if (this.includesAny(text, ['dependency', 'third', 'cloud', '依赖', '三方', '云'])) {
+    if (includesAny(text, ['dependency', 'third', 'cloud', '依赖', '三方', '云'])) {
       return { fillColor: '#ECFDF5', strokeColor: '#059669', fontSize: DEFAULT_FONT_SIZE, fontStyle: 'bold' };
     }
 
@@ -707,7 +705,7 @@ ${childrenXml}${edgesXml}
       outgoing.set(edge.source, targets);
     }
 
-    const startNodes = nodes.filter(node => this.isFlowchartStartNode(node) || (incomingCount.get(node.id) || 0) === 0);
+    const startNodes = nodes.filter(node => isFlowchartStartNode(node) || (incomingCount.get(node.id) || 0) === 0);
     const queue = [...(startNodes.length > 0 ? startNodes : nodes)].map(node => node.id);
     const ranks = new Map<string, number>();
 
@@ -741,33 +739,18 @@ ${childrenXml}${edgesXml}
   private applyFlowchartNodeDefaults(node: Node): void {
     if (node.shape) return;
 
-    if (this.isFlowchartStartNode(node) || this.isFlowchartEndNode(node)) {
+    if (isFlowchartStartNode(node) || isFlowchartEndNode(node)) {
       node.shape = 'rounded';
       return;
     }
 
-    if (this.isFlowchartDecisionNode(node)) {
+    if (isFlowchartDecisionNode(node)) {
       node.shape = 'diamond';
     }
   }
 
-  private isFlowchartStartNode(node: Node): boolean {
-    const text = `${node.id} ${node.name}`.toLowerCase();
-    return this.includesAny(text, ['start', '开始', '发起']);
-  }
-
-  private isFlowchartEndNode(node: Node): boolean {
-    const text = `${node.id} ${node.name}`.toLowerCase();
-    return this.includesAny(text, ['end', '结束', '完成', '终止']);
-  }
-
-  private isFlowchartDecisionNode(node: Node): boolean {
-    const text = `${node.id} ${node.name}`.toLowerCase();
-    return this.includesAny(text, ['?', '是否', '判断', '审批', '审核', '校验', '验证', '通过']);
-  }
-
   private isFlowchartBackwardEdge(edge: Edge): boolean {
-    return this.includesAny(edge.label || '', ['退回', '返回', '驳回', '重试', '重新']);
+    return isFlowchartBackwardEdge(edge.label);
   }
 
   private layoutArchitecture(elements: any[]): void {
@@ -817,12 +800,7 @@ ${childrenXml}${edgesXml}
   }
 
   private normalizeContainer(container: Container, diagramType?: string): void {
-    if (!container.geometry) {
-      container.geometry = { x: 0, y: 0, width: DEFAULT_CONTAINER_WIDTH, height: DEFAULT_CONTAINER_HEIGHT };
-    }
-
-    container.geometry.width = container.geometry.width || DEFAULT_CONTAINER_WIDTH;
-    container.geometry.height = container.geometry.height || DEFAULT_CONTAINER_HEIGHT;
+    ensureGeometry(container, DEFAULT_CONTAINER_WIDTH, DEFAULT_CONTAINER_HEIGHT);
 
     if (!container.children || container.children.length === 0) {
       return;
@@ -837,12 +815,7 @@ ${childrenXml}${edgesXml}
   }
 
   private ensureNodeGeometry(node: Node): void {
-    if (!node.geometry) {
-      node.geometry = { x: 0, y: 0 };
-    }
-
-    node.geometry.width = node.geometry.width || DEFAULT_NODE_WIDTH;
-    node.geometry.height = node.geometry.height || DEFAULT_NODE_HEIGHT;
+    ensureGeometry(node, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT);
   }
 
   private layoutContainerChildren(container: Container, diagramType?: string): void {
@@ -1111,28 +1084,12 @@ ${childrenXml}${edgesXml}
     return element.name.includes(value);
   }
 
-  private includesAny(text: string, values: string[]): boolean {
-    return values.some(value => text.includes(value));
-  }
-
   private expandContainerToFitChildren(container: Container): void {
-    const children = container.children || [];
-    if (children.length === 0) return;
-
-    let maxRight = 0;
-    let maxBottom = 0;
-
-    for (const child of children) {
-      const geometry = this.getGeometry(child);
-      maxRight = Math.max(maxRight, geometry.x + geometry.width);
-      maxBottom = Math.max(maxBottom, geometry.y + geometry.height);
-    }
-
-    container.geometry = {
-      ...this.getGeometry(container),
-      width: maxRight + CONTAINER_PADDING_X,
-      height: maxBottom + CONTAINER_PADDING_BOTTOM
-    };
+    expandContainerToFitChildren(container, {
+      paddingX: CONTAINER_PADDING_X,
+      paddingBottom: CONTAINER_PADDING_BOTTOM,
+      keepCurrentSize: false
+    });
   }
 
   private hasExplicitPosition(element: DiagramVertex): boolean {
@@ -1140,14 +1097,10 @@ ${childrenXml}${edgesXml}
   }
 
   private getGeometry(element: DiagramVertex): Required<Geometry> {
-    const defaultWidth = element.type === 'container' ? DEFAULT_CONTAINER_WIDTH : DEFAULT_NODE_WIDTH;
-    const defaultHeight = element.type === 'container' ? DEFAULT_CONTAINER_HEIGHT : DEFAULT_NODE_HEIGHT;
-
-    return {
-      x: element.geometry?.x || 0,
-      y: element.geometry?.y || 0,
-      width: element.geometry?.width || defaultWidth,
-      height: element.geometry?.height || defaultHeight
-    };
+    return readGeometry(
+      element,
+      element.type === 'container' ? DEFAULT_CONTAINER_WIDTH : DEFAULT_NODE_WIDTH,
+      element.type === 'container' ? DEFAULT_CONTAINER_HEIGHT : DEFAULT_NODE_HEIGHT
+    );
   }
 }

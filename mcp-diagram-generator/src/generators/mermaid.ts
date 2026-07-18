@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DiagramSpec, Node, Edge, ShapeType } from '../types.js';
+import { isFlowchartDecisionNode, isFlowchartEndNode, isFlowchartStartNode } from './shared/flowchart-keywords.js';
 
 export class MermaidGenerator {
   async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
@@ -36,7 +37,7 @@ export class MermaidGenerator {
   }
 
   private inferDiagramType(spec: DiagramSpec): 'flowchart' | 'sequence' | 'class' | 'er' {
-    // 优先读取显式指定的图表类型
+    // 优先读取显式指定的图表类型；其余情况一律按 flowchart 处理
     if (
       spec.diagramType === 'flowchart' ||
       spec.diagramType === 'sequence' ||
@@ -44,13 +45,6 @@ export class MermaidGenerator {
       spec.diagramType === 'er'
     ) {
       return spec.diagramType;
-    }
-
-    const nodes = spec.elements.filter(e => e.type === 'node') as Node[];
-    const hasDiamond = nodes.some(n => n.shape === 'diamond');
-
-    if (hasDiamond || nodes.length > 0) {
-      return 'flowchart';
     }
 
     return 'flowchart';
@@ -149,11 +143,6 @@ export class MermaidGenerator {
     }
 
     return styles;
-  }
-
-  private collectUniqueStyles(elements: any[]): Map<string, any> {
-    // 这个方法已被 getUniqueStyles 替代
-    return new Map();
   }
 
   private generateStyleKey(style: any): string {
@@ -302,33 +291,14 @@ export class MermaidGenerator {
   private applyFlowchartNodeDefaults(node: Node): void {
     if (node.shape) return;
 
-    if (this.isFlowchartStartNode(node) || this.isFlowchartEndNode(node)) {
+    if (isFlowchartStartNode(node) || isFlowchartEndNode(node)) {
       node.shape = 'rounded';
       return;
     }
 
-    if (this.isFlowchartDecisionNode(node)) {
+    if (isFlowchartDecisionNode(node)) {
       node.shape = 'diamond';
     }
-  }
-
-  private isFlowchartStartNode(node: Node): boolean {
-    const text = `${node.id} ${node.name}`.toLowerCase();
-    return this.includesAny(text, ['start', '开始', '发起']);
-  }
-
-  private isFlowchartEndNode(node: Node): boolean {
-    const text = `${node.id} ${node.name}`.toLowerCase();
-    return this.includesAny(text, ['end', '结束', '完成', '终止']);
-  }
-
-  private isFlowchartDecisionNode(node: Node): boolean {
-    const text = `${node.id} ${node.name}`.toLowerCase();
-    return this.includesAny(text, ['?', '是否', '判断', '审批', '审核', '校验', '验证', '通过']);
-  }
-
-  private includesAny(text: string, values: string[]): boolean {
-    return values.some(value => text.includes(value));
   }
 
   private generateClassDiagram(spec: DiagramSpec): string {

@@ -183,6 +183,14 @@ class DiagramServer {
     ];
   }
 
+  private ok(text: string): any {
+    return { content: [{ type: 'text', text }] };
+  }
+
+  private fail(text: string): any {
+    return { ...this.ok(text), isError: true };
+  }
+
   private async handleGenerateDiagram(params: GenerateDiagramParams): Promise<any> {
     await this.configManager.load();
 
@@ -194,28 +202,12 @@ class DiagramServer {
     };
 
     if (!spec.format) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Format must be specified either in diagram_spec or as format parameter'
-          }
-        ],
-        isError: true
-      };
+      return this.fail('Format must be specified either in diagram_spec or as format parameter');
     }
 
     const validation = this.validator.validate(spec);
     if (!validation.valid) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Validation failed:\n${validation.errors?.join('\n')}`
-          }
-        ],
-        isError: true
-      };
+      return this.fail(`Validation failed:\n${validation.errors?.join('\n')}`);
     }
 
     try {
@@ -244,24 +236,9 @@ class DiagramServer {
           throw new Error(`Unsupported format: ${spec.format}`);
       }
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Diagram generated successfully: ${finalPath}`
-          }
-        ]
-      };
+      return this.ok(`Diagram generated successfully: ${finalPath}`);
     } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error generating diagram: ${error instanceof Error ? error.message : String(error)}`
-          }
-        ],
-        isError: true
-      };
+      return this.fail(`Error generating diagram: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -269,25 +246,9 @@ class DiagramServer {
     const validation = this.validator.validate(args.spec);
 
     if (validation.valid) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Diagram specification is valid'
-          }
-        ]
-      };
-    } else {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Validation failed:\n${validation.errors?.join('\n')}`
-          }
-        ],
-        isError: true
-      };
+      return this.ok('Diagram specification is valid');
     }
+    return this.fail(`Validation failed:\n${validation.errors?.join('\n')}`);
   }
 
   private async handleInitConfig(args: { paths?: { drawio?: string; mermaid?: string; excalidraw?: string } }): Promise<any> {
@@ -313,49 +274,31 @@ class DiagramServer {
 
     const config = this.configManager.getConfig();
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Configuration initialized:\n` +
-            `  DrawIO: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
-            `  Mermaid: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
-            `  Excalidraw: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.excalidraw)}\n\n` +
-            `Directories created automatically.`
-        }
-      ]
-    };
+    return this.ok(
+      `Configuration initialized:\n` +
+      `  DrawIO: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
+      `  Mermaid: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
+      `  Excalidraw: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.excalidraw)}\n\n` +
+      `Directories created automatically.`
+    );
   }
 
   private async handleGetConfig(): Promise<any> {
     const config = await this.configManager.load();
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Current configuration:\n` +
-            `  Project Root: ${this.projectRoot}\n` +
-            `  Initialized: ${config.initialized}\n` +
-            `  DrawIO Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
-            `  Mermaid Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
-            `  Excalidraw Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.excalidraw)}`
-        }
-      ]
-    };
+    return this.ok(
+      `Current configuration:\n` +
+      `  Project Root: ${this.projectRoot}\n` +
+      `  Initialized: ${config.initialized}\n` +
+      `  DrawIO Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.drawio)}\n` +
+      `  Mermaid Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.mermaid)}\n` +
+      `  Excalidraw Path: ${resolveConfiguredPath(this.projectRoot, config.defaultOutputPaths.excalidraw)}`
+    );
   }
 
   private async handleSetOutputPath(args: { format: DiagramFormat; path: string }): Promise<any> {
     if (!['drawio', 'mermaid', 'excalidraw'].includes(args.format)) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Invalid format: ${args.format}. Expected one of: drawio, mermaid, excalidraw`
-          }
-        ],
-        isError: true
-      };
+      return this.fail(`Invalid format: ${args.format}. Expected one of: drawio, mermaid, excalidraw`);
     }
 
     await this.configManager.setOutputPath(args.format, args.path);
@@ -363,14 +306,7 @@ class DiagramServer {
     const fullPath = resolveConfiguredPath(this.projectRoot, args.path);
     await fs.mkdir(fullPath, { recursive: true });
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Output path for ${args.format} set to: ${fullPath}\nDirectory created if it did not exist.`
-        }
-      ]
-    };
+    return this.ok(`Output path for ${args.format} set to: ${fullPath}\nDirectory created if it did not exist.`);
   }
 
   private generateFilename(spec: DiagramSpec): string {

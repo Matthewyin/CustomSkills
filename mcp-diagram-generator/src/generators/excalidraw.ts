@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DiagramSpec, Node, Edge, Container, Geometry } from '../types.js';
+import { ensureGeometry, expandContainerToFitChildren, markExplicitPositions } from './shared/geometry.js';
 
 interface ExcalidrawElement {
   type: string;
@@ -79,24 +80,11 @@ export class ExcalidrawGenerator {
     this.resetState();
     // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
     const cloned = structuredClone(spec);
-    this.markExplicitPositions(cloned.elements);
+    markExplicitPositions(cloned.elements, this.explicitPositionIds);
     const data = this.generateData(cloned);
     const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
-  }
-
-  // 在任何默认几何填充之前，记录哪些元素在输入中显式指定了 x/y
-  private markExplicitPositions(elements: any[]): void {
-    for (const element of elements) {
-      if (element.type === 'edge') continue;
-      if (element.geometry && element.geometry.x !== undefined && element.geometry.y !== undefined) {
-        this.explicitPositionIds.add(element.id);
-      }
-      if (element.children) {
-        this.markExplicitPositions(element.children);
-      }
-    }
   }
 
   private resetState(): void {
@@ -521,7 +509,7 @@ export class ExcalidrawGenerator {
 
     const maxCols = children.length <= 4 ? 2 : 3;
     this.layoutElements(children, CONTAINER_PADDING_X, CONTAINER_HEADER_HEIGHT, maxCols, NODE_GAP_X, NODE_GAP_Y);
-    this.expandContainerToFitChildren(container, children);
+    this.expandContainerToFitChildren(container);
   }
 
   private layoutElements(elements: Array<Container | Node>, startX: number, startY: number, maxCols: number, gapX: number, gapY: number): void {
@@ -554,38 +542,18 @@ export class ExcalidrawGenerator {
     }
   }
 
-  private expandContainerToFitChildren(container: Container, children: Array<Container | Node>): void {
-    const geometry = this.ensureElementGeometry(container);
-    if (children.length === 0) {
-      return;
-    }
-
-    const maxRight = Math.max(...children.map(child => {
-      const childGeometry = this.ensureElementGeometry(child);
-      return childGeometry.x + (childGeometry.width || DEFAULT_NODE_WIDTH);
-    }));
-    const maxBottom = Math.max(...children.map(child => {
-      const childGeometry = this.ensureElementGeometry(child);
-      return childGeometry.y + (childGeometry.height || DEFAULT_NODE_HEIGHT);
-    }));
-
-    geometry.width = Math.max(geometry.width || DEFAULT_CONTAINER_WIDTH, maxRight + CONTAINER_PADDING_X);
-    geometry.height = Math.max(geometry.height || DEFAULT_CONTAINER_HEIGHT, maxBottom + CONTAINER_PADDING_BOTTOM);
+  private expandContainerToFitChildren(container: Container): void {
+    expandContainerToFitChildren(container, {
+      paddingX: CONTAINER_PADDING_X,
+      paddingBottom: CONTAINER_PADDING_BOTTOM,
+      keepCurrentSize: true
+    });
   }
 
   private ensureElementGeometry(element: Container | Node): Geometry {
-    const defaults = element.type === 'container'
-      ? { width: DEFAULT_CONTAINER_WIDTH, height: DEFAULT_CONTAINER_HEIGHT }
-      : { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT };
-
-    element.geometry = {
-      x: element.geometry?.x || 0,
-      y: element.geometry?.y || 0,
-      width: element.geometry?.width || defaults.width,
-      height: element.geometry?.height || defaults.height
-    };
-
-    return element.geometry;
+    return element.type === 'container'
+      ? ensureGeometry(element, DEFAULT_CONTAINER_WIDTH, DEFAULT_CONTAINER_HEIGHT)
+      : ensureGeometry(element, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT);
   }
 
   private shouldAutoPlace(element: Container | Node): boolean {

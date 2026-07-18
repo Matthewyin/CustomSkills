@@ -16,8 +16,9 @@
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc && node scripts/copy-schemas.mjs",
     "dev": "tsc --watch",
+    "test": "vitest run",
     "test:diagrams": "npm run build && node scripts/test-diagrams.mjs",
-    "prepublishOnly": "npm run build && npm run test:diagrams",
+    "prepublishOnly": "npm run build && npm test && npm run test:diagrams",
     "start": "node dist/index.js"
   },
   "keywords": [
@@ -33,7 +34,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.10"
   },
   "author": "",
   "license": "MIT"

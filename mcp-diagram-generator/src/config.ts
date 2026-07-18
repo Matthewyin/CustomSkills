@@ -72,10 +72,6 @@ export class ConfigManager {
     await this.save();
   }
 
-  isInitialized(): boolean {
-    return this.config.initialized;
-  }
-
   async markInitialized(): Promise<void> {
     this.config.initialized = true;
     await this.save();
