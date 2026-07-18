@@ -1,42 +1,48 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import Ajv, { ErrorObject, ValidateFunction } from 'ajv';
 import { DiagramSpec } from '../types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// layers/lanes × format 支持矩阵：architecture+layers、swimlane+lanes 仅 drawio 支持
+// mermaid 的 sequence/class/er 不支持容器嵌套（生成器只读顶层 node，容器内节点会被静默忽略）
+const MERMAID_FLAT_DIAGRAM_TYPES = ['sequence', 'class', 'er'];
+
 export class SchemaValidator {
-  private spec: any;
+  private validateSchema: ValidateFunction;
 
   constructor() {
     const schemaPath = path.join(__dirname, '../schemas/diagram-spec.schema.json');
-    this.spec = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+    let schema: object;
+    try {
+      schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+    } catch (error) {
+      // schema 损坏时必须给出清晰错误，而不是莫名崩溃
+      throw new Error(
+        `Failed to load diagram spec schema at ${schemaPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    this.validateSchema = new Ajv({ allErrors: true }).compile(schema);
   }
 
   validate(data: unknown): { valid: boolean; errors?: string[] } {
     const errors: string[] = [];
 
-    if (typeof data !== 'object' || data === null) {
-      return { valid: false, errors: ['Root must be an object'] };
+    // 结构校验：JSON Schema 是事实源（必填字段、id pattern、枚举、颜色格式等）
+    if (!this.validateSchema(data)) {
+      for (const error of this.validateSchema.errors || []) {
+        errors.push(this.formatSchemaError(error));
+      }
+      // 结构不合法时直接返回，避免在残缺数据上继续做语义校验
+      return { valid: false, errors };
     }
 
     const spec = data as DiagramSpec;
 
-    if (!spec.format || !['drawio', 'mermaid', 'excalidraw'].includes(spec.format)) {
-      errors.push(`Invalid format: ${spec.format}`);
-    }
-
-    if (!Array.isArray(spec.elements)) {
-      errors.push('elements must be an array');
-      return { valid: false, errors };
-    }
-
-    for (const element of spec.elements) {
-      this.validateElement(element, errors, true);
-    }
-
-    // 递归收集所有元素ID（包括容器内的子元素）
+    // 语义校验：递归收集所有元素ID（包括容器子元素、layers、lanes）并查重
     const allIds = this.collectAllIds(spec.elements, errors);
     this.collectSemanticIds(spec as any, allIds, errors);
 
@@ -54,28 +60,8 @@ export class SchemaValidator {
       this.validateFlowchart(spec as any, edgeElements, errors);
     }
 
-    const validateContainer = (container: any, depth = 0): void => {
-      if (depth > 10) {
-        errors.push('Container nesting too deep (>10 levels)');
-        return;
-      }
-
-      if (container.children) {
-        for (const child of container.children) {
-          this.validateElement(child, errors, false);
-
-          if (child.type === 'container') {
-            validateContainer(child, depth + 1);
-          }
-        }
-      }
-    };
-
-    for (const element of spec.elements) {
-      if (element.type === 'container') {
-        validateContainer(element);
-      }
-    }
+    this.validateContainerDepth(spec.elements, 0, errors);
+    this.validateSupportMatrix(spec, errors);
 
     return {
       valid: errors.length === 0,
@@ -83,35 +69,56 @@ export class SchemaValidator {
     };
   }
 
-  private validateElement(element: any, errors: string[], allowEdge: boolean): void {
-    if (!element.type || !['container', 'node', 'edge'].includes(element.type)) {
-      errors.push(`Invalid element type: ${element.type}`);
+  private formatSchemaError(error: ErrorObject): string {
+    const location = error.instancePath || '(root)';
+    const allowed = error.params?.allowedValues ?? error.params?.allowedValue;
+    if (allowed !== undefined) {
+      return `${location}: ${error.message} (${JSON.stringify(allowed)})`;
+    }
+    return `${location}: ${error.message}`;
+  }
+
+  private validateSupportMatrix(spec: DiagramSpec, errors: string[]): void {
+    const hasLayers = Boolean(spec.layers && spec.layers.length > 0);
+    const hasLanes = Boolean(spec.lanes && spec.lanes.length > 0);
+
+    if ((hasLayers || hasLanes) && spec.format !== 'drawio') {
+      errors.push(
+        `layers/lanes are only supported with format "drawio" (architecture+layers, swimlane+lanes); got format "${spec.format}"`
+      );
+    }
+
+    // drawio 的 layers/lanes 模式下顶层非 edge 元素会被生成器丢弃，必须提前报错
+    const layerMode = spec.diagramType === 'architecture' && hasLayers;
+    const laneMode = spec.diagramType === 'swimlane' && hasLanes;
+    if (spec.format === 'drawio' && (layerMode || laneMode)) {
+      const stray = spec.elements.filter(e => e.type !== 'edge');
+      if (stray.length > 0) {
+        errors.push(
+          `elements has ${stray.length} top-level node/container that would be silently dropped in ${spec.diagramType} mode; move them into ${layerMode ? 'layers' : 'lanes'} or keep elements edge-only`
+        );
+      }
+    }
+
+    if (spec.format === 'mermaid' && MERMAID_FLAT_DIAGRAM_TYPES.includes(spec.diagramType || '')) {
+      if (spec.elements.some(e => e.type === 'container')) {
+        errors.push(
+          `diagramType "${spec.diagramType}" with format "mermaid" does not support containers; flatten container children into top-level nodes`
+        );
+      }
+    }
+  }
+
+  private validateContainerDepth(elements: any[], depth: number, errors: string[]): void {
+    if (depth > 10) {
+      errors.push('Container nesting too deep (>10 levels)');
       return;
     }
 
-    if (element.type === 'edge' && !allowEdge) {
-      errors.push('Edge elements are only allowed at the top level');
-    }
-
-    if (element.type !== 'edge' && !element.name) {
-      errors.push(`Element missing name: ${element.id || '<missing id>'}`);
-    }
-
-    if (element.type !== 'edge' && !element.id) {
-      errors.push('Element missing id');
-    }
-
-    if (element.type === 'node' && element.deviceType && typeof element.deviceType !== 'string') {
-      errors.push(`Invalid deviceType: ${element.deviceType}`);
-    }
-
-    if (element.type === 'node') {
-      this.validateStringArray(element.fields, `Invalid fields for node: ${element.id}`, errors);
-      this.validateStringArray(element.methods, `Invalid methods for node: ${element.id}`, errors);
-    }
-
-    if (element.type === 'edge' && element.relation && !this.isValidRelation(element.relation)) {
-      errors.push(`Invalid relation: ${element.relation}`);
+    for (const element of elements) {
+      if (element.type === 'container' && element.children) {
+        this.validateContainerDepth(element.children, depth + 1, errors);
+      }
     }
   }
 
@@ -145,7 +152,6 @@ export class SchemaValidator {
     for (const layer of spec.layers || []) {
       this.addId(layer.id, ids, errors);
       for (const component of layer.components || []) {
-        this.validateElement({ ...component, type: 'node' }, errors, false);
         this.addId(component.id, ids, errors);
       }
     }
@@ -153,8 +159,6 @@ export class SchemaValidator {
     for (const lane of spec.lanes || []) {
       this.addId(lane.id, ids, errors);
       for (const step of lane.steps || []) {
-        if (!step.id) errors.push('Swimlane step missing id');
-        if (!step.name) errors.push(`Swimlane step missing name: ${step.id || '<missing id>'}`);
         this.addId(step.id, ids, errors);
       }
     }
@@ -210,31 +214,5 @@ export class SchemaValidator {
     }
 
     return nodes;
-  }
-
-  private validateStringArray(value: unknown, message: string, errors: string[]): void {
-    if (value === undefined) return;
-    if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) {
-      errors.push(message);
-    }
-  }
-
-  private isValidRelation(value: string): boolean {
-    return [
-      'association',
-      'inheritance',
-      'composition',
-      'aggregation',
-      'dependency',
-      'realization',
-      'oneToOne',
-      'oneToMany',
-      'manyToOne',
-      'manyToMany',
-      'zeroOrOneToMany',
-      'sync',
-      'async',
-      'return'
-    ].includes(value);
   }
 }

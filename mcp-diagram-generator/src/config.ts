@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { resolveConfiguredPath } from './utils/output-path.js';
 
 export interface DiagramConfig {
   defaultOutputPaths: {
@@ -37,8 +38,13 @@ export class ConfigManager {
       this.config = { ...DEFAULT_CONFIG, ...JSON.parse(content) };
       return this.config;
     } catch (error) {
-      // Config file doesn't exist, return defaults
-      return this.config;
+      // 只有文件不存在时静默回退默认配置；JSON 损坏等错误必须抛出清晰错误
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return this.config;
+      }
+      throw new Error(
+        `Failed to load config file ${this.configPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -58,12 +64,12 @@ export class ConfigManager {
     format: keyof DiagramConfig['defaultOutputPaths'],
     path: string
   ): Promise<void> {
+    // 运行时防御非法 format key，避免把垃圾 key 写进配置文件
+    if (!['drawio', 'mermaid', 'excalidraw'].includes(format)) {
+      throw new Error(`Invalid format: ${format}. Expected one of: drawio, mermaid, excalidraw`);
+    }
     this.config.defaultOutputPaths[format] = path;
     await this.save();
-  }
-
-  isInitialized(): boolean {
-    return this.config.initialized;
   }
 
   async markInitialized(): Promise<void> {
@@ -77,7 +83,7 @@ export class ConfigManager {
 
   async ensureDirectoriesExist(basePath: string): Promise<void> {
     for (const format of Object.keys(this.config.defaultOutputPaths)) {
-      const dir = path.join(
+      const dir = resolveConfiguredPath(
         basePath,
         this.config.defaultOutputPaths[format as keyof typeof DEFAULT_CONFIG.defaultOutputPaths]
       );

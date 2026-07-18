@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DiagramSpec, Node, Edge, Container, Geometry } from '../types.js';
+import { ensureGeometry, expandContainerToFitChildren, markExplicitPositions } from './shared/geometry.js';
 
 interface ExcalidrawElement {
   type: string;
@@ -72,10 +73,15 @@ export class ExcalidrawGenerator {
   private boundArrowsMap = new Map<string, Array<{ type: 'arrow'; id: string }>>();
   private edgeIdMap = new Map<any, string>();
   private nextId = 1;
+  // 记录输入 spec 中显式给出了 x/y 的元素 id，避免默认几何填充后无法区分显式 (0,0)
+  private explicitPositionIds = new Set<string>();
 
   async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
     this.resetState();
-    const data = this.generateData(spec);
+    // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
+    const cloned = structuredClone(spec);
+    markExplicitPositions(cloned.elements, this.explicitPositionIds);
+    const data = this.generateData(cloned);
     const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
@@ -87,6 +93,7 @@ export class ExcalidrawGenerator {
     this.boundArrowsMap.clear();
     this.edgeIdMap.clear();
     this.nextId = 1;
+    this.explicitPositionIds.clear();
   }
 
   private preassignIds(elements: any[]): void {
@@ -502,7 +509,7 @@ export class ExcalidrawGenerator {
 
     const maxCols = children.length <= 4 ? 2 : 3;
     this.layoutElements(children, CONTAINER_PADDING_X, CONTAINER_HEADER_HEIGHT, maxCols, NODE_GAP_X, NODE_GAP_Y);
-    this.expandContainerToFitChildren(container, children);
+    this.expandContainerToFitChildren(container);
   }
 
   private layoutElements(elements: Array<Container | Node>, startX: number, startY: number, maxCols: number, gapX: number, gapY: number): void {
@@ -512,8 +519,9 @@ export class ExcalidrawGenerator {
     let rowHeight = 0;
 
     for (const element of elements) {
-      const geometry = this.ensureElementGeometry(element);
+      // 必须先判断是否自动摆放，再补默认几何，否则默认的 (0,0) 会被误判为未指定
       const shouldPlace = this.shouldAutoPlace(element);
+      const geometry = this.ensureElementGeometry(element);
 
       if (shouldPlace) {
         geometry.x = cursorX;
@@ -534,42 +542,23 @@ export class ExcalidrawGenerator {
     }
   }
 
-  private expandContainerToFitChildren(container: Container, children: Array<Container | Node>): void {
-    const geometry = this.ensureElementGeometry(container);
-    if (children.length === 0) {
-      return;
-    }
-
-    const maxRight = Math.max(...children.map(child => {
-      const childGeometry = this.ensureElementGeometry(child);
-      return childGeometry.x + (childGeometry.width || DEFAULT_NODE_WIDTH);
-    }));
-    const maxBottom = Math.max(...children.map(child => {
-      const childGeometry = this.ensureElementGeometry(child);
-      return childGeometry.y + (childGeometry.height || DEFAULT_NODE_HEIGHT);
-    }));
-
-    geometry.width = Math.max(geometry.width || DEFAULT_CONTAINER_WIDTH, maxRight + CONTAINER_PADDING_X);
-    geometry.height = Math.max(geometry.height || DEFAULT_CONTAINER_HEIGHT, maxBottom + CONTAINER_PADDING_BOTTOM);
+  private expandContainerToFitChildren(container: Container): void {
+    expandContainerToFitChildren(container, {
+      paddingX: CONTAINER_PADDING_X,
+      paddingBottom: CONTAINER_PADDING_BOTTOM,
+      keepCurrentSize: true
+    });
   }
 
   private ensureElementGeometry(element: Container | Node): Geometry {
-    const defaults = element.type === 'container'
-      ? { width: DEFAULT_CONTAINER_WIDTH, height: DEFAULT_CONTAINER_HEIGHT }
-      : { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT };
-
-    element.geometry = {
-      x: element.geometry?.x || 0,
-      y: element.geometry?.y || 0,
-      width: element.geometry?.width || defaults.width,
-      height: element.geometry?.height || defaults.height
-    };
-
-    return element.geometry;
+    return element.type === 'container'
+      ? ensureGeometry(element, DEFAULT_CONTAINER_WIDTH, DEFAULT_CONTAINER_HEIGHT)
+      : ensureGeometry(element, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT);
   }
 
   private shouldAutoPlace(element: Container | Node): boolean {
-    return !element.geometry || ((element.geometry.x || 0) === 0 && (element.geometry.y || 0) === 0);
+    // 输入中未显式指定 x/y 的元素才自动摆放；显式 (0,0) 也应被尊重
+    return !this.explicitPositionIds.has(element.id);
   }
 
   private getCenter(position: ElementPosition): Point {

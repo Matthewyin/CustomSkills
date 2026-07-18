@@ -39,6 +39,14 @@
     }
   },
   "definitions": {
+    "color": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^#[0-9A-Fa-f]{6}$" },
+        { "const": "none" }
+      ],
+      "description": "#RRGGBB color, or \"none\" for drawio no-fill/no-stroke"
+    },
     "architectureLayer": {
       "type": "object",
       "required": ["id", "name", "components"],
@@ -159,10 +167,10 @@
     "style": {
       "type": "object",
       "properties": {
-        "fillColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
-        "strokeColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "fillColor": { "$ref": "#/definitions/color" },
+        "strokeColor": { "$ref": "#/definitions/color" },
         "strokeWidth": { "type": "number", "minimum": 0 },
-        "fontColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "fontColor": { "$ref": "#/definitions/color" },
         "fontSize": { "type": "number", "minimum": 6 },
         "fontStyle": { "type": "string", "enum": ["normal", "bold", "italic"] },
         "borderRadius": { "type": "number", "minimum": 0 },
@@ -172,10 +180,10 @@
     "edgeStyle": {
       "type": "object",
       "properties": {
-        "strokeColor": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "strokeColor": { "$ref": "#/definitions/color" },
         "strokeWidth": { "type": "number", "minimum": 0 },
-        "endArrow": { "type": "string", "enum": ["none", "arrow", "circle", "diamond"] },
-        "startArrow": { "type": "string", "enum": ["none", "arrow", "circle", "diamond"] },
+        "endArrow": { "type": "string", "enum": ["none", "arrow", "block", "circle", "diamond"] },
+        "startArrow": { "type": "string", "enum": ["none", "arrow", "block", "circle", "diamond"] },
         "dashPattern": { "type": "string" },
         "lineStyle": { "type": "string", "enum": ["straight", "orthogonal", "curved"] }
       }

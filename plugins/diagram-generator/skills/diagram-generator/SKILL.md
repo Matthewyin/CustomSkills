@@ -1,7 +1,7 @@
 ---
 name: diagram-generator
-description: Generate and edit diagrams with the mcp-diagram-generator MCP server. Use this skill for new diagrams, existing .drawio/.mmd/.excalidraw edits, network topology, architecture, flowchart, swimlane, sequence, class, ER, mind map, and Excalidraw whiteboard work. Always use this skill when the user asks to draw, generate, revise, or export any diagram.
-version: 1.1.3
+description: Generate and edit diagrams with the mcp-diagram-generator MCP server. Use this skill for new diagrams, existing .drawio/.mmd/.excalidraw edits, network topology, architecture, flowchart, swimlane, sequence, class, ER, and Excalidraw whiteboard work. Always use this skill when the user asks to draw, generate, revise, or export any diagram.
+version: 1.2.0
 ---
 
 # Diagram Generator
@@ -105,7 +105,6 @@ Use these defaults unless the user explicitly chooses otherwise:
 | Sequence | Mermaid | Automatic |
 | Class | Mermaid | Automatic |
 | ER | Mermaid | Automatic |
-| Mind map | Mermaid | Automatic |
 | Whiteboard sketch | Excalidraw | Automatic |
 
 Usage context can override defaults:

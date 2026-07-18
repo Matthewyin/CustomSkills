@@ -141,11 +141,26 @@ Start
 | Sequence Diagram | **Mermaid** | Draw.io |
 | Class Diagram | **Mermaid** | Draw.io |
 | ER Diagram | **Mermaid** | Draw.io |
-| Mindmap | **Mermaid** | Excalidraw (for hand-drawn) |
 | Network Topology | **Draw.io** | Excalidraw for whiteboard-style topology when explicitly requested |
 | System Architecture | **Draw.io** | Mermaid (for high-level) |
 | Whiteboard Sketch | **Excalidraw** | Draw.io (formal) |
 | Brainstorming | **Excalidraw** | Mermaid (structured) |
+
+## Feature Support Matrix
+
+`layers` and `lanes` are only implemented by the Draw.io generator. The validator rejects unsupported combinations instead of silently dropping elements.
+
+| Spec Feature | Draw.io | Mermaid | Excalidraw |
+|--------------|---------|---------|------------|
+| `diagramType: "architecture"` + `layers` | ✅ Supported | ❌ Validation error | ❌ Validation error |
+| `diagramType: "swimlane"` + `lanes` | ✅ Supported | ❌ Validation error | ❌ Validation error |
+| Nested containers | ✅ Supported | Flowchart only (`subgraph`) | ✅ Supported |
+| Containers in sequence / class / ER | ✅ Supported | ❌ Validation error | ✅ Supported |
+
+Rules enforced by validation:
+- A spec with `layers` or `lanes` must use `format: "drawio"`.
+- In Draw.io architecture/swimlane mode, top-level `elements` must be edges only; place nodes inside `layers[].components` or `lanes[].steps`.
+- Mermaid sequence, class, and ER diagrams do not support containers; flatten container children into top-level nodes.
 
 ## Migration Considerations
 
