@@ -67,34 +67,15 @@ const ROOT_START_Y = 80;
 const ROOT_GAP_X = 80;
 const ROOT_GAP_Y = 70;
 
-export class ExcalidrawGenerator {
+// 单次生成的渲染上下文：所有可变状态都挂在每次 generate 新建的实例上，避免跨调用串状态
+class ExcalidrawRenderContext {
   private idMap = new Map<string, string>();
   private positionMap = new Map<string, ElementPosition>();
   private boundArrowsMap = new Map<string, Array<{ type: 'arrow'; id: string }>>();
-  private edgeIdMap = new Map<any, string>();
+  private edgeIdMap = new Map<Edge, string>();
   private nextId = 1;
   // 记录输入 spec 中显式给出了 x/y 的元素 id，避免默认几何填充后无法区分显式 (0,0)
   private explicitPositionIds = new Set<string>();
-
-  async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
-    this.resetState();
-    // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
-    const cloned = structuredClone(spec);
-    markExplicitPositions(cloned.elements, this.explicitPositionIds);
-    const data = this.generateData(cloned);
-    const dir = path.dirname(outputPath);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
-  }
-
-  private resetState(): void {
-    this.idMap.clear();
-    this.positionMap.clear();
-    this.boundArrowsMap.clear();
-    this.edgeIdMap.clear();
-    this.nextId = 1;
-    this.explicitPositionIds.clear();
-  }
 
   private preassignIds(elements: any[]): void {
     for (const element of elements) {
@@ -109,7 +90,8 @@ export class ExcalidrawGenerator {
     }
   }
 
-  private generateData(spec: DiagramSpec): ExcalidrawData {
+  generateData(spec: DiagramSpec): ExcalidrawData {
+    markExplicitPositions(spec.elements, this.explicitPositionIds);
     const elements: ExcalidrawElement[] = [];
 
     this.normalizeLayout(spec.elements);
@@ -618,5 +600,16 @@ export class ExcalidrawGenerator {
       x: midX + 12,
       y: midY - labelHeight / 2
     };
+  }
+}
+
+export class ExcalidrawGenerator {
+  async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
+    // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
+    // 每次生成构造独立的渲染上下文，生成状态不跨调用共享
+    const data = new ExcalidrawRenderContext().generateData(structuredClone(spec));
+    const dir = path.dirname(outputPath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
   }
 }

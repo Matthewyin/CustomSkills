@@ -34,7 +34,8 @@ const SWIMLANE_GAP = 18;
 const FLOWCHART_BRANCH_GAP = 72;
 const FLOWCHART_LEVEL_GAP = 52;
 
-export class DrawioGenerator {
+// 单次生成的渲染上下文：所有可变状态都挂在每次 generate 新建的实例上，避免跨调用串状态
+class DrawioRenderContext {
   private nextCellId = 1;
   private idMap = new Map<string, string>();
   private flatNodes: FlatNode[] = [];
@@ -47,16 +48,7 @@ export class DrawioGenerator {
   // 记录输入 spec 中显式给出了 x/y 的元素 id，避免默认几何填充后无法区分显式 (0,0)
   private explicitPositionIds = new Set<string>();
 
-  async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
-    // 深拷贝入参，布局归一化会改写 geometry/shape，不能污染调用方对象
-    const xml = this.generateXml(structuredClone(spec));
-    const dir = path.dirname(outputPath);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(outputPath, xml, 'utf-8');
-  }
-
-  private generateXml(spec: DiagramSpec): string {
-    this.resetState();
+  generateXml(spec: DiagramSpec): string {
     this.markExplicitPositions(spec);
 
     const elements = this.buildDrawableElements(spec);
@@ -85,19 +77,6 @@ ${childrenXml}${edgesXml}
     </mxGraphModel>
   </diagram>
 </mxfile>`;
-  }
-
-  private resetState(): void {
-    this.nextCellId = 1;
-    this.idMap.clear();
-    this.flatNodes = [];
-    this.flatEdges = [];
-    this.renderedEdgeLabels.clear();
-    this.shouldRenderEdgeLabels = true;
-    this.shouldForceStraightEdges = false;
-    this.swimlaneStepColumns.clear();
-    this.swimlaneColumnCount = 0;
-    this.explicitPositionIds.clear();
   }
 
   // 在任何默认几何填充之前，记录哪些元素在输入中显式指定了 x/y
@@ -1102,5 +1081,16 @@ ${childrenXml}${edgesXml}
       element.type === 'container' ? DEFAULT_CONTAINER_WIDTH : DEFAULT_NODE_WIDTH,
       element.type === 'container' ? DEFAULT_CONTAINER_HEIGHT : DEFAULT_NODE_HEIGHT
     );
+  }
+}
+
+export class DrawioGenerator {
+  async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
+    // 深拷贝入参，布局归一化会改写 geometry/shape，不能污染调用方对象
+    // 每次生成构造独立的渲染上下文，生成状态不跨调用共享
+    const xml = new DrawioRenderContext().generateXml(structuredClone(spec));
+    const dir = path.dirname(outputPath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(outputPath, xml, 'utf-8');
   }
 }
