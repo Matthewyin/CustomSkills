@@ -27,7 +27,8 @@
     "excalidraw"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4"
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "ajv": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
