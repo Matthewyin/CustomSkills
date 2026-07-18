@@ -1,6 +1,6 @@
 # MCP Diagram Generator
 
-> **Version**: 1.0.1 | **Status**: ✅ Production Ready | **Last Updated**: 2025-02-04
+> **Version**: 1.2.0 | **Status**: ✅ Production Ready | **Last Updated**: 2026-07-18
 
 A powerful diagram generation tool that provides diagram creation capabilities for Claude Code and other AI assistants through the Model Context Protocol (MCP). Supports **Draw.io**, **Mermaid**, and **Excalidraw** - three mainstream formats.
 
@@ -238,7 +238,7 @@ Connections between two nodes, supports labels.
 
 ---
 
-### Mermaid (.md)
+### Mermaid (.mmd)
 
 **Advantages**:
 - ✅ Code-friendly, version control friendly
@@ -419,7 +419,7 @@ mcp-diagram-generator/
 
 ## 📊 Quality Metrics
 
-### Current Version Performance (v1.0.1)
+### Current Version Performance (v1.2.0)
 
 | Metric | Value | Description |
 |------|------|------|
@@ -472,8 +472,6 @@ mcp-diagram-generator/
    - Issue: Used `:::` style syntax (not supported)
    - Fix: Use `%%{}` inline style syntax
    - Verification: All Mermaid diagrams render correctly
-
-Detailed fix records: [docs/FIXES_COMPLETED.md](docs/FIXES_COMPLETED.md)
 
 ---
 
@@ -542,7 +540,6 @@ Contributions welcome! Please feel free to:
 
 ## 📞 Support
 
-- **Documentation**: [docs/](docs/)
 - **Issue Reporting**: GitHub Issues
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
