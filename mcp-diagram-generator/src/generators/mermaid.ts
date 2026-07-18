@@ -106,7 +106,8 @@ export class MermaidGenerator {
         if (!element.style) {
           element.style = {};
         }
-        (element.style as any).__className = className;
+        // Style 接口已声明内部字段 __className，直接写入
+        element.style.__className = className;
       }
 
       // 递归处理容器内的子元素

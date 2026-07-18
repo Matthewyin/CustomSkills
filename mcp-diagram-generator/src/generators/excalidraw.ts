@@ -3,6 +3,11 @@ import * as path from 'path';
 import { DiagramSpec, Node, Edge, Container, Geometry } from '../types.js';
 import { ensureGeometry, expandContainerToFitChildren, markExplicitPositions } from './shared/geometry.js';
 
+interface ExcalidrawBoundElement {
+  type: string;
+  id: string;
+}
+
 interface ExcalidrawElement {
   type: string;
   id: string;
@@ -20,12 +25,17 @@ interface ExcalidrawElement {
   text?: string;
   fontSize?: number;
   fontFamily?: number;
+  textAlign?: string;
+  verticalAlign?: string;
   points?: [[number, number], [number, number]];
+  lastCommittedPoint?: [number, number];
   startArrowhead?: string | null;
   endArrowhead?: string | null;
   startBinding?: { elementId: string; focus?: number; gap?: number };
   endBinding?: { elementId: string; focus?: number; gap?: number };
-  containerId?: { id: string };
+  boundElements?: ExcalidrawBoundElement[];
+  // 注意：代码里实际存的是被绑定元素的字符串 id
+  containerId?: string;
   groupIds?: string[];
   angle?: number;
   roundness?: { type: number };
@@ -67,34 +77,15 @@ const ROOT_START_Y = 80;
 const ROOT_GAP_X = 80;
 const ROOT_GAP_Y = 70;
 
-export class ExcalidrawGenerator {
+// 单次生成的渲染上下文：所有可变状态都挂在每次 generate 新建的实例上，避免跨调用串状态
+class ExcalidrawRenderContext {
   private idMap = new Map<string, string>();
   private positionMap = new Map<string, ElementPosition>();
   private boundArrowsMap = new Map<string, Array<{ type: 'arrow'; id: string }>>();
-  private edgeIdMap = new Map<any, string>();
+  private edgeIdMap = new Map<Edge, string>();
   private nextId = 1;
   // 记录输入 spec 中显式给出了 x/y 的元素 id，避免默认几何填充后无法区分显式 (0,0)
   private explicitPositionIds = new Set<string>();
-
-  async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
-    this.resetState();
-    // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
-    const cloned = structuredClone(spec);
-    markExplicitPositions(cloned.elements, this.explicitPositionIds);
-    const data = this.generateData(cloned);
-    const dir = path.dirname(outputPath);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
-  }
-
-  private resetState(): void {
-    this.idMap.clear();
-    this.positionMap.clear();
-    this.boundArrowsMap.clear();
-    this.edgeIdMap.clear();
-    this.nextId = 1;
-    this.explicitPositionIds.clear();
-  }
 
   private preassignIds(elements: any[]): void {
     for (const element of elements) {
@@ -109,7 +100,8 @@ export class ExcalidrawGenerator {
     }
   }
 
-  private generateData(spec: DiagramSpec): ExcalidrawData {
+  generateData(spec: DiagramSpec): ExcalidrawData {
+    markExplicitPositions(spec.elements, this.explicitPositionIds);
     const elements: ExcalidrawElement[] = [];
 
     this.normalizeLayout(spec.elements);
@@ -212,7 +204,7 @@ export class ExcalidrawGenerator {
       opacity: 100,
       boundElements: allBoundElements,
       groupIds: [groupId]
-    } as any;
+    };
 
     const labelElement: ExcalidrawElement = {
       type: 'text',
@@ -231,7 +223,7 @@ export class ExcalidrawGenerator {
       opacity: 100,
       containerId: idStr,
       groupIds: [groupId]
-    } as any;
+    };
 
     elements.push(containerElement, labelElement);
 
@@ -292,10 +284,10 @@ export class ExcalidrawGenerator {
       opacity: 100,
       boundElements: allBoundElements,
       groupIds: [groupId]
-    } as any;
+    };
 
     if (shape === 'rounded') {
-      (element as any).roundness = { type: 3 };
+      element.roundness = { type: 3 };
     }
 
     // 创建独立的文本元素
@@ -316,7 +308,7 @@ export class ExcalidrawGenerator {
       opacity: 100,
       containerId: idStr,
       groupIds: [groupId]
-    } as any;
+    };
 
     // 保存节点位置信息（使用形状的 ID）
     this.positionMap.set(idStr, { x: absX, y: absY, width: nodeWidth, height: nodeHeight });
@@ -396,7 +388,7 @@ export class ExcalidrawGenerator {
         focus: endFocus,
         gap: 0
       }
-    } as any;
+    };
 
     if (edge.style?.endArrow === 'none') {
       element.endArrowhead = null;
@@ -418,14 +410,14 @@ export class ExcalidrawGenerator {
         strokeColor: edge.style?.strokeColor || '#000000',
         roughness: 1,
         opacity: 100
-      } as any;
+      };
 
       // 将标签绑定到箭头
-      (labelElement as any).containerId = arrowId;
+      labelElement.containerId = arrowId;
 
       // 在箭头上记录绑定的元素
-      (element as any).boundElements = (element as any).boundElements || [];
-      (element as any).boundElements.push({
+      element.boundElements = element.boundElements || [];
+      element.boundElements.push({
         type: 'text',
         id: labelId.toString()
       });
@@ -618,5 +610,16 @@ export class ExcalidrawGenerator {
       x: midX + 12,
       y: midY - labelHeight / 2
     };
+  }
+}
+
+export class ExcalidrawGenerator {
+  async generate(spec: DiagramSpec, outputPath: string): Promise<void> {
+    // 深拷贝入参，自动布局会回填 geometry，不能污染调用方对象
+    // 每次生成构造独立的渲染上下文，生成状态不跨调用共享
+    const data = new ExcalidrawRenderContext().generateData(structuredClone(spec));
+    const dir = path.dirname(outputPath);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(outputPath, JSON.stringify(data, null, 2), 'utf-8');
   }
 }

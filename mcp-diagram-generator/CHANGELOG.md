@@ -17,6 +17,12 @@ All notable changes to the mcp-diagram-generator MCP server will be documented i
 - **Layout**: explicit `(0, 0)` geometry is now respected (previously treated as "unspecified").
 - **Generators**: each generator deep-clones the incoming spec (`structuredClone`), so layout normalization no longer mutates the caller's object.
 
+### Changed (internal quality, no behavior change; generated output is byte-identical)
+- **Testing**: regression suite migrated to vitest (`tests/`, 42 cases incl. negative validation cases) running directly against `src`; `scripts/test-diagrams.mjs` remains as the dist smoke test. `npm test` runs the unit suite; `prepublishOnly` runs build + both suites.
+- **Shared generator utilities**: flowchart keyword classifiers and geometry helpers (explicit-position marking, geometry ensure/read, container expansion) deduplicated into `src/generators/shared/`, parameterized by each generator's own constants.
+- **Per-run render context**: Draw.io and Excalidraw generation state now lives on a fresh render-context object created per `generate()` call instead of mutable fields on the long-lived generator instance, eliminating cross-call state leakage.
+- **Types**: `ExcalidrawElement` interface completed (`boundElements`, `textAlign`, `verticalAlign`, `lastCommittedPoint`, `containerId: string`, `roundness`); all `as any` casts removed from `src/`.
+
 ## [1.1.0] - 2026-02-06
 
 ### Added
