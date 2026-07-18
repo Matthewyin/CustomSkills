@@ -3,6 +3,11 @@ import * as path from 'path';
 import { DiagramSpec, Node, Edge, Container, Geometry } from '../types.js';
 import { ensureGeometry, expandContainerToFitChildren, markExplicitPositions } from './shared/geometry.js';
 
+interface ExcalidrawBoundElement {
+  type: string;
+  id: string;
+}
+
 interface ExcalidrawElement {
   type: string;
   id: string;
@@ -20,12 +25,17 @@ interface ExcalidrawElement {
   text?: string;
   fontSize?: number;
   fontFamily?: number;
+  textAlign?: string;
+  verticalAlign?: string;
   points?: [[number, number], [number, number]];
+  lastCommittedPoint?: [number, number];
   startArrowhead?: string | null;
   endArrowhead?: string | null;
   startBinding?: { elementId: string; focus?: number; gap?: number };
   endBinding?: { elementId: string; focus?: number; gap?: number };
-  containerId?: { id: string };
+  boundElements?: ExcalidrawBoundElement[];
+  // 注意：代码里实际存的是被绑定元素的字符串 id
+  containerId?: string;
   groupIds?: string[];
   angle?: number;
   roundness?: { type: number };
@@ -194,7 +204,7 @@ class ExcalidrawRenderContext {
       opacity: 100,
       boundElements: allBoundElements,
       groupIds: [groupId]
-    } as any;
+    };
 
     const labelElement: ExcalidrawElement = {
       type: 'text',
@@ -213,7 +223,7 @@ class ExcalidrawRenderContext {
       opacity: 100,
       containerId: idStr,
       groupIds: [groupId]
-    } as any;
+    };
 
     elements.push(containerElement, labelElement);
 
@@ -274,10 +284,10 @@ class ExcalidrawRenderContext {
       opacity: 100,
       boundElements: allBoundElements,
       groupIds: [groupId]
-    } as any;
+    };
 
     if (shape === 'rounded') {
-      (element as any).roundness = { type: 3 };
+      element.roundness = { type: 3 };
     }
 
     // 创建独立的文本元素
@@ -298,7 +308,7 @@ class ExcalidrawRenderContext {
       opacity: 100,
       containerId: idStr,
       groupIds: [groupId]
-    } as any;
+    };
 
     // 保存节点位置信息（使用形状的 ID）
     this.positionMap.set(idStr, { x: absX, y: absY, width: nodeWidth, height: nodeHeight });
@@ -378,7 +388,7 @@ class ExcalidrawRenderContext {
         focus: endFocus,
         gap: 0
       }
-    } as any;
+    };
 
     if (edge.style?.endArrow === 'none') {
       element.endArrowhead = null;
@@ -400,14 +410,14 @@ class ExcalidrawRenderContext {
         strokeColor: edge.style?.strokeColor || '#000000',
         roughness: 1,
         opacity: 100
-      } as any;
+      };
 
       // 将标签绑定到箭头
-      (labelElement as any).containerId = arrowId;
+      labelElement.containerId = arrowId;
 
       // 在箭头上记录绑定的元素
-      (element as any).boundElements = (element as any).boundElements || [];
-      (element as any).boundElements.push({
+      element.boundElements = element.boundElements || [];
+      element.boundElements.push({
         type: 'text',
         id: labelId.toString()
       });

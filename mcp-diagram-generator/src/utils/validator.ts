@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import Ajv, { ErrorObject, ValidateFunction } from 'ajv';
-import { DiagramSpec } from '../types.js';
+import { DiagramSpec, Edge } from '../types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,9 +44,9 @@ export class SchemaValidator {
 
     // 语义校验：递归收集所有元素ID（包括容器子元素、layers、lanes）并查重
     const allIds = this.collectAllIds(spec.elements, errors);
-    this.collectSemanticIds(spec as any, allIds, errors);
+    this.collectSemanticIds(spec, allIds, errors);
 
-    const edgeElements = spec.elements.filter(e => e.type === 'edge') as any[];
+    const edgeElements = spec.elements.filter(e => e.type === 'edge') as Edge[];
     for (const edge of edgeElements) {
       if (!allIds.has(edge.source)) {
         errors.push(`Edge source not found: ${edge.source}`);
@@ -57,7 +57,7 @@ export class SchemaValidator {
     }
 
     if (spec.diagramType === 'flowchart') {
-      this.validateFlowchart(spec as any, edgeElements, errors);
+      this.validateFlowchart(spec, edgeElements, errors);
     }
 
     this.validateContainerDepth(spec.elements, 0, errors);
@@ -148,7 +148,7 @@ export class SchemaValidator {
     return ids;
   }
 
-  private collectSemanticIds(spec: any, ids: Set<string>, errors: string[]): void {
+  private collectSemanticIds(spec: DiagramSpec, ids: Set<string>, errors: string[]): void {
     for (const layer of spec.layers || []) {
       this.addId(layer.id, ids, errors);
       for (const component of layer.components || []) {
@@ -182,7 +182,7 @@ export class SchemaValidator {
     ids.add(id);
   }
 
-  private validateFlowchart(spec: any, edges: any[], errors: string[]): void {
+  private validateFlowchart(spec: DiagramSpec, edges: Edge[], errors: string[]): void {
     const nodes = this.collectNodes(spec.elements || []);
 
     for (const node of nodes) {
