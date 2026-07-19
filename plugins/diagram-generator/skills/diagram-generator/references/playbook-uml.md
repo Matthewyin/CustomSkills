@@ -4,8 +4,8 @@ Use this playbook for sequence diagrams, class diagrams, ER diagrams, and other 
 
 ## Default Choice
 
-- Default format: Mermaid
-- Default direction: automatic
+Default format/direction: see the dispatch table in SKILL.md.
+
 - Use Draw.io only when the user needs custom visual placement or presentation-grade styling.
 - Excalidraw is not recommended unless the user explicitly wants a whiteboard sketch.
 

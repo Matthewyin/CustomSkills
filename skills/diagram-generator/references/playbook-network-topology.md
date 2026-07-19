@@ -4,9 +4,9 @@ Use this playbook for datacenters, network zones, routers, switches, firewalls, 
 
 ## Default Choice
 
-- Default format: Draw.io
-- Default direction: vertical
-- Best use: Word documents, engineering documentation, editable topology diagrams
+Default format/direction: see the dispatch table in SKILL.md.
+
+- Best use: Word documents, engineering documentation, editable topology diagrams.
 - Excalidraw is acceptable only when the user explicitly wants a whiteboard or hand-drawn version.
 - Mermaid is not recommended for complex topology because nested containers and device styling are limited.
 
@@ -77,6 +77,43 @@ Use `deviceType` instead of relying only on the node name:
 | External system | `externalSystem` |
 
 If the prompt contains an unknown device type such as DWDM, keep the device name and use the default device style instead of failing.
+
+## Generator Heuristics (Draw.io Layout)
+
+The Draw.io generator applies these layout rules automatically. Explicit fields take precedence where noted.
+
+### Zone Device Columns
+
+Inside a `zone` container, nodes are grouped into columns 0-6. An explicit `deviceType` is mapped first; otherwise the generator falls back to a case-insensitive substring match on the node's `id` and `name`:
+
+| Column | `deviceType` Mapping | Name/`id` Keyword Fallback |
+| --- | --- | --- |
+| 0 | `router`, `externalSystem` | `router`, `路由`, `省中心`, `银行` |
+| 1 | `accessSwitch` | `access`, `接入交换机` |
+| 2 | `firewall` | `fw`, `firewall`, `防火墙` |
+| 3 (default) | `switch`, `gateway`, `service`, `server` | `dmz`, `汇聚`, `dwdm`, `otn`, `sdh`, `传输` |
+| 4 | `loadBalancer`, `sslGateway`, `proxy`, `database`, `cache`, `messageQueue` | `f5`, `ssl`, `nginx`, `代理` |
+| 5 | `coreSwitch` | `core`, `核心` |
+| 6 | `cloud` | `cloud`, `专有云` |
+
+Nodes without any match land in column 3. Within a column, nodes flow two per row.
+
+### Datacenter Zone Ordering
+
+Inside a `datacenter` container, zones whose `name` contains `核心` or `专有云` are pulled out of the normal two-per-row grid and placed centered below all other zones: `核心` first, then `专有云`.
+
+### Environment Children
+
+Inside an `environment` container, children with `level: "other"` are treated as external systems and placed in the top row; datacenters and remaining containers flow two per row below.
+
+### Edge Label Deduplication
+
+Topology edges are straight and label-free by default (see Draw.io Rules). Even when labels are enabled, identical label texts are rendered only once per diagram.
+
+How to avoid surprises:
+- Always set `deviceType` instead of relying on name keywords.
+- Avoid `核心`/`专有云` in zone names unless the zone really is the core or private-cloud zone.
+- Provide explicit `geometry` when the automatic placement does not match the intended reading order; explicit positions always win.
 
 ## Required Colors And Shapes
 

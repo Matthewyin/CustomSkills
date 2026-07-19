@@ -4,6 +4,27 @@ This guide describes the JSON specification passed to the `mcp-diagram-generator
 
 > **Source of truth**: structural constraints (required fields, id patterns, enums, color formats) are defined by `mcp-diagram-generator/src/schemas/diagram-spec.schema.json` and enforced by the server via ajv. This document focuses on conventions and examples; when the two disagree, the schema file wins.
 
+## Contents
+
+- [Root Object](#root-object)
+- [Element Types](#element-types)
+- [Container](#container)
+- [Node](#node)
+- [Edge](#edge)
+- [Relation Values](#relation-values)
+- [Style](#style)
+- [Edge Style](#edge-style)
+- [Geometry](#geometry)
+- [Architecture Input](#architecture-input)
+- [Swimlane Input](#swimlane-input)
+- [Flowchart Example](#flowchart-example)
+- [Sequence Example](#sequence-example)
+- [Class Example](#class-example)
+- [ER Example](#er-example)
+- [Network Topology Example](#network-topology-example)
+- [Style Presets](#style-presets)
+- [Best Practices](#best-practices)
+
 ## Root Object
 
 ```json
