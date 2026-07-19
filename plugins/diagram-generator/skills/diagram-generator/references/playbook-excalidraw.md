@@ -4,9 +4,9 @@ Use this playbook when the user explicitly wants Excalidraw, a hand-drawn style,
 
 ## Default Choice
 
-- Default format: Excalidraw
-- Default direction: automatic
-- Best use: whiteboard collaboration, informal exploration, workshop drafts
+Default format/direction: see the dispatch table in SKILL.md.
+
+- Best use: whiteboard collaboration, informal exploration, workshop drafts.
 - Do not use Excalidraw by default for dense engineering-grade network topology unless the user explicitly asks.
 
 ## Layout Rules

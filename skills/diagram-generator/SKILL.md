@@ -1,7 +1,6 @@
 ---
 name: diagram-generator
 description: Generate and edit diagrams with the mcp-diagram-generator MCP server. Use this skill for new diagrams, existing .drawio/.mmd/.excalidraw edits, network topology, architecture, flowchart, swimlane, sequence, class, ER, and Excalidraw whiteboard work. Always use this skill when the user asks to draw, generate, revise, or export any diagram.
-version: 1.2.0
 ---
 
 # Diagram Generator
@@ -20,8 +19,6 @@ Supported work:
 - Existing `.drawio`, `.mmd`, and `.excalidraw` edits
 - Default output paths under `diagrams/{format}/`
 - Custom filenames and output paths
-
-Contact: AlkaidY, `tccio2023@gmail.com`.
 
 ## Required MCP Tools
 
@@ -45,20 +42,7 @@ Recommended remote configuration:
 }
 ```
 
-Local development configuration:
-
-```json
-{
-  "mcpServers": {
-    "mcp-diagram-generator": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-diagram-generator/dist/index.js"]
-    }
-  }
-}
-```
-
-After changing configuration, restart the agent environment. On first use, the server creates `.diagram-config.json` and default output directories.
+After changing configuration, restart the agent environment. On first use, the server creates `.diagram-config.json` and default output directories. For local development configuration, see the "Tool missing" entry in Troubleshooting.
 
 ## Main Workflow
 
@@ -145,10 +129,8 @@ Universal rules:
 - `elements` must be an array.
 - IDs must be unique.
 - Edges must be top-level elements, never inside `children`.
-- Edge `source` and `target` must resolve to an existing node or container.
-- `style` must be an object.
-- Colors should use `#RRGGBB`.
-- Use `fillColor: "none"` for Draw.io no-fill nodes when needed.
+
+Full field reference: `references/json-schema-guide.md`.
 
 ### 5. Quality Gate
 
@@ -231,7 +213,8 @@ Update one format path:
 ## Troubleshooting
 
 Tool missing:
-- Configure the MCP server and restart the agent environment.
+- Configure the MCP server with the remote (npx) block above and restart the agent environment.
+- For local development, use `"command": "node", "args": ["/absolute/path/to/mcp-diagram-generator/dist/index.js"]` instead.
 
 Schema validation failed:
 - Read `references/json-schema-guide.md`.

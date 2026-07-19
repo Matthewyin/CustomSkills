@@ -4,8 +4,8 @@ Use this playbook for cross-team processes, departmental approvals, handoffs, re
 
 ## Default Choice
 
-- Default format: Draw.io
-- Default direction: horizontal
+Default format/direction: see the dispatch table in SKILL.md.
+
 - Use Mermaid only for a very simple sequence of handoffs.
 - Use Excalidraw only for workshop-style drafts.
 

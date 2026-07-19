@@ -1,5 +1,5 @@
 {
   "name": "diagram-generator",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Generate Draw.io, Mermaid, and Excalidraw diagrams from structured prompts using an MCP server."
 }

@@ -4,8 +4,8 @@ Use this playbook for system architecture, application architecture, platform ar
 
 ## Default Choice
 
-- Default format: Draw.io
-- Default direction: vertical or automatic
+Default format/direction: see the dispatch table in SKILL.md.
+
 - Use Mermaid only for high-level architecture summaries.
 - Use Excalidraw only for informal whiteboard architecture sketches.
 

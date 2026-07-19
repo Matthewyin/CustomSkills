@@ -4,8 +4,8 @@ Use this playbook for process flows, approval flows, decision trees, retry flows
 
 ## Default Choice
 
-- Default format: Mermaid
-- Default direction: vertical
+Default format/direction: see the dispatch table in SKILL.md.
+
 - Use Draw.io for complex multi-branch layouts that need manual placement.
 - Use Excalidraw only for informal whiteboard process sketches.
 
@@ -38,6 +38,27 @@ Use Excalidraw for whiteboard process diagrams:
 - Bind and group text with shapes.
 - Bind connectors to element edges.
 - Put edge labels away from connector lines.
+
+## Generator Heuristics: Keyword-Based Shapes
+
+The Mermaid and Draw.io generators share one keyword table. When a node has no explicit `shape`, its shape is inferred from a case-insensitive substring match against the node's `id` and `name` combined:
+
+| Keyword in node `id`/`name` | Inferred Shape |
+| --- | --- |
+| `start`, `开始`, `发起` | rounded (start/end) |
+| `end`, `结束`, `完成`, `终止` | rounded (start/end) |
+| `?`, `是否`, `判断`, `审批`, `审核`, `校验`, `验证`, `通过` | diamond (decision) |
+
+Rules:
+- An explicit `shape` field always wins over keyword inference.
+- Start/end keywords are checked before decision keywords.
+- Matching also covers the node `id` and is substring-based: an id like `restart` matches `start`, and a name like `已完成` matches `完成`.
+
+Draw.io layout also treats edge labels containing `退回`, `返回`, `驳回`, `重试`, or `重新` as backward edges: they are excluded from rank calculation so they do not push the main flow downward.
+
+How to avoid surprises:
+- Set `shape` explicitly when a node name contains a trigger word but needs another shape.
+- Keep trigger words out of node `id`s unless you also set an explicit `shape`.
 
 ## Quality Gate
 
