@@ -275,6 +275,16 @@ flowchart TD
 
 ---
 
+## 🤖 Generator Heuristics
+
+The generators apply a few automatic, keyword-based behaviors. Explicit spec fields always take precedence.
+
+- **Flowchart shapes**: without an explicit `shape`, a node's shape is inferred from keywords in its `id`/`name` — start/end keywords produce rounded nodes, decision keywords (e.g. 是否, 审批, 通过) produce diamonds. An explicit `shape` always wins. Full table: `skills/diagram-generator/references/playbook-flowchart.md`.
+- **Topology device columns**: inside a zone, nodes are grouped into layout columns. An explicit `deviceType` is mapped first, name keywords are the fallback, and unmatched nodes land in the default column. Full table: `skills/diagram-generator/references/playbook-network-topology.md`.
+- **Datacenter zone ordering**: zones named with 核心 or 专有云 are pulled out of the normal grid and placed centered below the other zones. Provide explicit `geometry` to control placement yourself.
+
+---
+
 ## 📖 Usage Examples
 
 ### Example 1: Microservices Architecture Diagram
